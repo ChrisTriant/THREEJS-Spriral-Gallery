@@ -13,8 +13,11 @@ body
 
 .webgl
 {
-    position: fixed;
-    top: 0;
-    left: 0;
+    position: absolute;
     outline: none;
+}
+
+.canvas_container{
+    margin-top: 0px;
+    margin-left: 0px;
 }

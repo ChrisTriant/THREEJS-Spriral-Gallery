@@ -15,35 +15,55 @@ const textureLoader = new THREE.TextureLoader()
 // Scene
 const scene = new THREE.Scene()
 
-const geometry = new THREE.PlaneBufferGeometry(0.5, 0.5);
 
+//set-up circle
 const pivot = new THREE.Object3D()
 scene.add(pivot);
-//const sphereMat = new THREE.MeshStandardMaterial()
-//const sphere = new THREE.Mesh(sphereGeo,sphereMat)
 
-const imageNum=8
+const imageNum=8;
+const imageArr=[];
+const circleRadius=0.6;
+const imageRadius = 0.2
+const imageSegments = 64  //3-64
+const geometry = new THREE.CircleBufferGeometry(imageRadius, imageSegments);     //const geometry = new THREE.PlaneBufferGeometry(0.5, 0.5);
+const spiralType=0;
 
-const imageArr=[]
 
 for (let i = 0; i < imageNum; i++) {
     const material = new THREE.MeshBasicMaterial({ 
         map: textureLoader.load(`/photographs/image${i}.jpg`) 
     })
-
     const img = new THREE.Mesh(geometry,material);
-    //img.position.set(-1.5+i*1,0);
     imageArr.push(img);
-    imageArr[i].position.x=Math.cos(i/4*Math.PI);
-    imageArr[i].position.z=Math.sin(i/4*Math.PI);
+    switch(spiralType){
+        case 0: {
+            imageArr[i].position.y=circleRadius*Math.cos(i/4*Math.PI);
+            imageArr[i].position.x=circleRadius*Math.sin(i/4*Math.PI);
+        }
+        break;
+        case 1:{
+            imageArr[i].position.x=circleRadius*Math.cos(i/4*Math.PI);
+            imageArr[i].position.z=circleRadius*Math.sin(i/4*Math.PI);
+        }
+        break;
+        default:{
+            imageArr[i].position.y=circleRadius*Math.cos(i/4*Math.PI);
+            imageArr[i].position.x=circleRadius*Math.sin(i/4*Math.PI);
+        }
+        break;
+    }
+    
     scene.add(img);
     pivot.add(img);
+
 }
+
+
 
 
 // Lights
 
-const pointLight = new THREE.PointLight(0xffffff, 0.1)
+const pointLight = new THREE.PointLight(0xffffff, 1)
 pointLight.position.x = 2
 pointLight.position.y = 3
 pointLight.position.z = 4
@@ -83,6 +103,7 @@ scene.add(camera)
 
 gui.add(camera.position,'x').min(-5).max(5).step(0.1)
 gui.add(camera.position,'y').min(-5).max(5).step(0.1)
+gui.add(camera.position,'z').min(-5).max(5).step(0.1)
 
 // Controls
 // const controls = new OrbitControls(camera, canvas)
@@ -104,18 +125,16 @@ window.addEventListener("wheel",onMouseWheel)
 let delta=0;
 let direction=1;
 let scrolled=false;
-let horizontal_speed=0;
+let rotation_speed=0;
 let vertical_speed=0;
-let displacement = 0.01;
+let displacement = 0.05;
 let directionChanged=false;
 let lead = 0;
 let static_lead = false;
 let autospeed = 0.003;
-let scrolledOnce=false;
 
 
 function onMouseWheel(event){
-    scrolledOnce=true;
     delta=event.deltaY * 0.0007
     const old_direction=direction;
     scrolled=true;
@@ -128,8 +147,9 @@ function onMouseWheel(event){
     }else{
         directionChanged=false;
     }
-    horizontal_speed=8;
+    rotation_speed=8;
     vertical_speed=0.25;
+    //console.log(direction)
 }
 
 
@@ -138,41 +158,110 @@ function onMouseWheel(event){
  */
 
 
-const clock = new THREE.Clock()
-
-const tick = () => {
-
-    const elapsedTime = clock.getElapsedTime()
-
-
-
-    // Update objects
-
-    if(imageArr[0].position.y-imageArr[1].position.y > 0.3){
+const HorizontalSpin = () =>{
+    if(Math.abs(imageArr[0].position.z-imageArr[1].position.z) > 0.3){
         static_lead=true;
+    }
+
+    if(directionChanged){
+        static_lead=false;
     }
 
     lead=10;
 
     if(scrolled){
-        pivot.rotation.y+=direction*horizontal_speed*0.01;
-        
+        pivot.rotation.z+=direction*rotation_speed*0.01;
+
         for(let i=0;i<imageArr.length;i++){
-            imageArr[i].rotation.y-=direction*horizontal_speed*0.01;
-            imageArr[i].position.y+=direction*((lead*displacement)*vertical_speed); //imageArr[i].position.y+=direction*((i*displacement)*vertical_speed);
-            
+            imageArr[i].rotation.z-=direction*rotation_speed*0.01;
+            if(direction<0 && (imageArr[i].position.z.toPrecision(2)==="0.001" || imageArr[i].position.z<0 )){
+                //console.log("reset to circle")
+                static_lead=false;
+            }else{
+                imageArr[i].position.z+=direction*(lead*displacement*vertical_speed); 
+                //console.log(imageArr[i].position.z)
+            }
             if(!static_lead){
                 if(direction>0)
                     lead--;
                 else
                     lead++;
             }
+        } 
+
+        if(!(direction<0 && (imageArr[0].position.z.toPrecision(2)==="0.001" || imageArr[0].position.z<0 ))){
+            pivot.position.z-=direction*((8*displacement)*vertical_speed);
+        }else{
+            pivot.position.z=0;
+            for(let i=0;i<imageArr.length;i++){
+                imageArr[i].position.z=0;
+            }
         }
-        //pivot.position.y-=direction*((8*displacement)*vertical_speed); 
         
-        horizontal_speed*=.95;
+        //console.log(pivot.position.z)
+
+        rotation_speed*=.95;
         vertical_speed*=0.90;
-        if(horizontal_speed<0.1){
+        if(rotation_speed<0.1){
+            scrolled=false;
+            vertical_speed=0;
+        }
+    }
+    else{
+        pivot.rotation.z+=direction*autospeed;
+        for(let i=0;i<imageArr.length;i++){
+            imageArr[i].rotation.z-=direction*autospeed;
+        }
+
+    }
+}
+
+const VerticalSpin = () => {
+    if(Math.abs(imageArr[0].position.y - imageArr[7].position.y) > 2){
+        static_lead=true;
+        console.log(imageArr[0].position.y - imageArr[7].position.y)
+    }
+
+    if(directionChanged){
+        //static_lead=false;
+    }
+
+    lead=10;
+
+    if(scrolled){
+        pivot.rotation.y+=direction*rotation_speed*0.01;
+
+        for(let i=0;i<imageArr.length;i++){
+            imageArr[i].rotation.y-=direction*rotation_speed*0.01;
+            if(direction<0 && (imageArr[i].position.y.toPrecision(2)==="0.001" || imageArr[i].position.y<0 )){
+                console.log(imageArr[i].position.y)
+                static_lead=false;
+            }else{
+                imageArr[i].position.y+=direction*(lead*displacement*vertical_speed); 
+                //console.log(imageArr[i].position.y)
+            }
+            if(!static_lead){
+                if(direction>0)
+                    lead--;
+                else
+                    lead++;
+            }
+        } 
+
+        if(!(direction<0 && (imageArr[0].position.y.toPrecision(2)==="0.001" || imageArr[0].position.y<0 ))){
+            pivot.position.y-=direction*((8*displacement)*vertical_speed);
+        }else{
+            pivot.position.y=0;
+            for(let i=0;i<imageArr.length;i++){
+                imageArr[i].position.y=0;
+            }
+        }
+        
+        //console.log(pivot.position.z)
+
+        rotation_speed*=.95;
+        vertical_speed*=0.90;
+        if(rotation_speed<0.1){
             scrolled=false;
             vertical_speed=0;
         }
@@ -184,8 +273,26 @@ const tick = () => {
         }
 
     }
+}
 
 
+const clock = new THREE.Clock()
+
+function setSpinFun(){
+    switch(spiralType){
+        case 0: return HorizontalSpin
+        case 1: return VerticalSpin;
+        default: return HorizontalSpin;
+    }
+}
+var spinFunction = setSpinFun()
+
+const tick = () => {
+
+    const elapsedTime = clock.getElapsedTime()
+
+    // Update objects
+    spinFunction();
 
     // Update Orbital Controls
     // controls.update()
